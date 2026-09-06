@@ -10,6 +10,18 @@ import { validateSession } from '../session.js';
 import { errorResponse, requestBodyTooLarge } from '../utils.js';
 
 const FILE_RESPONSE_CACHE_CONTROL = 'private, no-store';
+const R2_MISMATCH_MESSAGE = 'R2 put/get mismatch';
+
+function r2UnavailableError(message = R2_MISMATCH_MESSAGE) {
+  const error = new Error(message);
+  error.status = 503;
+  error.code = 'r2_unavailable';
+  return error;
+}
+
+function isR2UnavailableError(error) {
+  return error?.status === 503 || error?.code === 'r2_unavailable';
+}
 const UPLOAD_BODY_OVERHEAD_BYTES = 1024 * 1024;
 const BLOCKED_MIME_TYPES = new Set([
   'text/html',
@@ -74,7 +86,7 @@ function validateUpload(env, file) {
 export function registerUploadRoutes(app) {
   app.post('/api/upload', async (c) => {
     if (!c.env.FILES) {
-      return errorResponse('当前部署没有绑定 R2，无法上传附件', 503);
+      return errorResponse(R2_MISMATCH_MESSAGE, 503);
     }
 
     const session = c.get('session');
@@ -93,6 +105,9 @@ export function registerUploadRoutes(app) {
       return c.json({ file: result.file });
     } catch (error) {
       const message = String(error?.message || '');
+      if (isR2UnavailableError(error)) {
+        return errorResponse(message || R2_MISMATCH_MESSAGE, 503);
+      }
       if (message.startsWith('文件大小不能超过') || message === '该文件类型不允许上传') {
         return errorResponse(message);
       }
@@ -112,7 +127,7 @@ export function registerUploadRoutes(app) {
       return new Response('Forbidden', { status: 403 });
     }
     if (!c.env.FILES) {
-      return errorResponse('当前部署没有绑定 R2，无法读取附件', 503);
+      return errorResponse(R2_MISMATCH_MESSAGE, 503);
     }
 
     const [object, fileMetadata] = await Promise.all([
@@ -162,6 +177,9 @@ export function registerUploadRoutes(app) {
 }
 
 export async function saveUploadedFile(env, session, file, { clientUploadId = null } = {}) {
+  if (!env.FILES) {
+    throw r2UnavailableError();
+  }
   validateUpload(env, file);
   if (clientUploadId) {
     const existing = await getUploadedFileByClientId(env.DB, session.userId, clientUploadId);
@@ -177,6 +195,20 @@ export async function saveUploadedFile(env, session, file, { clientUploadId = nu
     httpMetadata: { contentType, cacheControl: FILE_RESPONSE_CACHE_CONTROL },
     customMetadata: { filename, edgechatEncryption: 'v1' }
   });
+  let stored;
+  try {
+    stored = await env.FILES.get(key);
+  } catch {
+    stored = null;
+  }
+  if (!stored) {
+    try {
+      await env.FILES.delete(key);
+    } catch {
+      // Best-effort cleanup after a failed verify.
+    }
+    throw r2UnavailableError();
+  }
 
   try {
     await recordUploadedFile(env.DB, {

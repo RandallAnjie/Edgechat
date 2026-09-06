@@ -1,0 +1,63 @@
+{
+  "name": "edgechat",
+  "main": "dist-rf/worker.js",
+  "compatibilityDate": "2026-04-05",
+  "vars": {
+    "ADMIN_USERNAMES": "admin",
+    "MESSAGE_RETENTION_DAYS": "7",
+    "SOFT_DELETE_RETENTION_DAYS": "60",
+    "GC_BATCH_SIZE": "500",
+    "GC_MAX_BATCHES_PER_RUN": "20",
+    "R2_DELETE_MAX_RETRY": "8",
+    "ALLOWED_FILE_TYPES": "image/,video/,audio/,application/pdf,text/",
+    "MAX_FILE_SIZE": "20971520"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "edgechat-db"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "namespace_title": "edgechat-sessions"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "edgechat-files"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHANNEL_ROOM",
+        "class_name": "ChannelRoom"
+      },
+      {
+        "name": "USER_INBOX",
+        "class_name": "UserInbox"
+      },
+      {
+        "name": "SCHEDULER",
+        "class_name": "Scheduler"
+      }
+    ]
+  },
+  "triggers": {
+    "crons": ["0 19 * * *"]
+  },
+  "locks": {
+    "task": "T-20260906-01",
+    "websocket": "ordinary-do-websocket",
+    "static": "worker-embedded",
+    "delivery": "rrangler-only",
+    "hibernation": false,
+    "pages": false,
+    "officialWranglerToCloudflare": false,
+    "release": false,
+    "telegram": "out"
+  }
+}

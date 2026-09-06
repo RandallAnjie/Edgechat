@@ -10,7 +10,6 @@ import {
   unpinRoomMessage
 } from '../message-pinning.js';
 import { submitExternalMessage } from '../external-message-submission.js';
-import { forwardEdgeChatMessageToTelegram } from '../integrations/telegram/bridge.js';
 import { authorizeRoom } from '../room-access.js';
 import { validateSession } from '../session.js';
 import { projectUnreadMessage } from '../unread-projection.js';
@@ -67,14 +66,23 @@ export class ChannelRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
+    // Ordinary DO WebSocket only. RandallFlare has no hibernation API
+    // (acceptWebSocket / getWebSockets / serializeAttachment).
     this.connections = new Map();
+  }
 
-    for (const socket of this.state.getWebSockets()) {
-      const meta = socket.deserializeAttachment();
-      if (meta) {
-        this.connections.set(socket, meta);
-      }
-    }
+  attachSocket(server, meta) {
+    server.accept();
+    this.connections.set(server, meta);
+    server.addEventListener('message', (event) => {
+      void this.handleSocketMessage(server, event.data);
+    });
+    server.addEventListener('close', () => {
+      this.connections.delete(server);
+    });
+    server.addEventListener('error', () => {
+      this.connections.delete(server);
+    });
   }
 
   parsePayload(ws, message) {
@@ -119,7 +127,6 @@ export class ChannelRoom {
       room
     );
     this.connections.set(ws, nextMeta);
-    ws.serializeAttachment(nextMeta);
     return nextMeta;
   }
 
@@ -159,8 +166,7 @@ export class ChannelRoom {
           senderId: message.sender.kind === 'local' ? message.sender.id : null,
           message,
           replyToSenderId
-        }),
-        forwardEdgeChatMessageToTelegram(this.env, { room, message })
+        })
       ])
     );
   }
@@ -301,10 +307,8 @@ export class ChannelRoom {
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
-    this.state.acceptWebSocket(server);
     const meta = socketMeta(token, principal, room);
-    server.serializeAttachment(meta);
-    this.connections.set(server, meta);
+    this.attachSocket(server, meta);
     server.send(
       JSON.stringify({
         protocolVersion: 1,
@@ -320,7 +324,7 @@ export class ChannelRoom {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  async webSocketMessage(ws, message) {
+  async handleSocketMessage(ws, message) {
     const meta = this.connections.get(ws);
     if (!meta) {
       return;
@@ -369,7 +373,6 @@ export class ChannelRoom {
         payload
       );
       await this.broadcast(packet);
-      // 未读与外部桥接都属于提交后投影，异步执行以缩短 WebSocket 发送链路。
       this.runMessageProjections(currentMeta.room, saved);
     } catch (error) {
       if (
@@ -389,11 +392,4 @@ export class ChannelRoom {
     }
   }
 
-  webSocketClose(ws) {
-    this.connections.delete(ws);
-  }
-
-  webSocketError(ws) {
-    this.connections.delete(ws);
-  }
 }

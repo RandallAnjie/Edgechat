@@ -11,7 +11,6 @@ import AdminUsersPage from './pages/AdminUsersPage.vue';
 import AdminStoragePage from './pages/AdminStoragePage.vue';
 import AdminInvitesPage from './pages/AdminInvitesPage.vue';
 import AdminSitePage from './pages/AdminSitePage.vue';
-import AdminTelegramPage from './pages/AdminTelegramPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 import { addAuthInvalidListener } from './auth-storage.js';
 
@@ -22,6 +21,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginPage,
+      meta: { public: true, transition: 'page' }
+    },
+    {
+      path: '/register',
+      name: 'register-public',
+      component: RegisterPage,
       meta: { public: true, transition: 'page' }
     },
     {
@@ -68,12 +73,6 @@ const router = createRouter({
           name: 'admin-invites',
           component: AdminInvitesPage,
           meta: { admin: true, adminTitleKey: 'admin.nav.invites', adminIcon: 'invites', transition: 'page' }
-        },
-        {
-          path: 'telegram',
-          name: 'admin-telegram',
-          component: AdminTelegramPage,
-          meta: { admin: true, adminTitleKey: 'admin.nav.telegram', adminIcon: 'telegram', transition: 'page' }
         },
         {
           path: 'maintenance',

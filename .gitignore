@@ -16,6 +16,7 @@ AGENTS.md
 Agent.md
 frontend/dist/
 frontend/demo-dist/
+dist-rf/
 .playwright-cli/
 .tmp/
 worker/src/generated/

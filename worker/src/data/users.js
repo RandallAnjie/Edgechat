@@ -1,4 +1,5 @@
 import { publicFileUrl } from "../utils.js";
+import { ApiError } from "../errors.js";
 import { activeUserSql, projectUserBan } from "../user-status.js";
 
 function mapUserSummary(row) {
@@ -16,6 +17,46 @@ function mapAdminUser(row) {
 		...projectUserBan(row),
 		createdAt: row.created_at,
 	};
+}
+
+export async function countActiveUsers(db) {
+	const { results } = await db
+		.prepare(
+			`SELECT COUNT(*) AS n
+			 FROM users
+			 WHERE deleted_at IS NULL`,
+		)
+		.all();
+	return Number(results[0]?.n || 0);
+}
+
+export async function createUser(db, user) {
+	try {
+		const result = await db
+			.prepare(
+				`INSERT INTO users (
+					 username,
+					 display_name,
+					 password_hash,
+					 password_salt,
+					 is_admin
+				 ) VALUES (?, ?, ?, ?, ?)`,
+			)
+			.bind(
+				user.username,
+				user.displayName,
+				user.passwordHash,
+				user.passwordSalt,
+				user.isAdmin ? 1 : 0,
+			)
+			.run();
+		return Number(result.meta.last_row_id);
+	} catch (error) {
+		if (String(error?.message || error).includes("UNIQUE")) {
+			throw new ApiError("用户名已存在");
+		}
+		throw error;
+	}
 }
 
 export async function getUserByUsername(db, username) {

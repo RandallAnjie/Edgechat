@@ -56,7 +56,7 @@ test('生产 Web 跨入后台时发起真实文档请求，后台内部仍使用
 
 test('侧栏包含存储统计并移除消息查看入口', () => {
   assert.match(sidebarSource, /t\('admin\.sidebar\.brand'\)/);
-  for (const id of ['dashboard', 'users', 'storage', 'invites', 'telegram', 'site']) {
+  for (const id of ['dashboard', 'users', 'storage', 'invites', 'site']) {
     assert.match(navigationSource, new RegExp(`id: '${id}'`));
   }
   assert.match(navigationSource, /labelKey: 'admin\.nav\.createUser'/);
@@ -70,7 +70,7 @@ test('侧栏包含存储统计并移除消息查看入口', () => {
 });
 
 test('侧栏维护入口按导航顺序排列且不吸附到底部', () => {
-  const navigationOrder = ['storage', 'invites', 'telegram', 'site', 'maintenance'].map(
+  const navigationOrder = ['storage', 'invites', 'site', 'maintenance'].map(
     (id) => navigationSource.indexOf(`id: '${id}'`)
   );
   assert.ok(navigationOrder.every((index) => index >= 0));
@@ -161,14 +161,11 @@ test('仪表盘复用现有概况接口并只展示可验证统计', () => {
   assert.match(dashboardSource, /t\('dashboard\.systemOverview'\)/);
 });
 
-test('Telegram 互通页由管理员路由保护并分别管理 Bot 与公开群组映射', () => {
-  assert.match(routerSource, /import AdminTelegramPage/);
-  assert.match(routerSource, /path: 'telegram'/);
-  assert.match(routerSource, /adminTitleKey: 'admin\.nav\.telegram'/);
+test('Telegram 本刀 OUT：后台导航与路由不再挂互通页', () => {
+  assert.doesNotMatch(routerSource, /import AdminTelegramPage/);
+  assert.doesNotMatch(routerSource, /path: 'telegram'/);
+  assert.doesNotMatch(navigationSource, /id: 'telegram'/);
   assert.match(telegramSource, /api\.saveAdminTelegramConfig/);
-  assert.match(telegramSource, /api\.createAdminTelegramMapping/);
-  assert.match(telegramSource, /type="checkbox"/);
-  assert.match(telegramSource, /t\('telegram\.chatId'\)/);
 });
 
 test('仪表盘在中等桌面宽度提前重排且快捷入口文字保持完整', () => {
@@ -214,7 +211,6 @@ test('后台核心 Vue 文件保持在单一职责的可维护规模', () => {
     ['AdminDashboardPage', dashboardSource],
     ['AdminUsersPage', usersSource],
     ['AdminStoragePage', storageSource],
-    ['AdminTelegramPage', telegramSource],
     ['AdminSitePage', siteSource]
   ]) {
     assert.ok(source.split('\n').length < 260, `${name} 不应重新膨胀为超大文件`);

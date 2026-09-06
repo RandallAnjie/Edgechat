@@ -322,7 +322,7 @@ CREATE TABLE IF NOT EXISTS telegram_mappings (
 );
 
 INSERT OR IGNORE INTO site_settings (setting_key, setting_value)
-VALUES ('site_name', 'Edgechat');
+VALUES ('site_name', 'Randall');
 
 INSERT OR IGNORE INTO site_settings (setting_key, setting_value)
 VALUES ('site_icon_url', '');

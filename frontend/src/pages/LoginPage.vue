@@ -113,6 +113,7 @@ async function submit(event) {
         <button class="login-btn" :disabled="loading" type="submit">
           {{ loading ? t('auth.signingIn') : t('auth.signIn') }}
         </button>
+        <router-link class="auth-switch" to="/register">{{ t('auth.createAccount') }}</router-link>
 
         <p v-if="error" class="error-text">{{ error }}</p>
       </form>
@@ -299,6 +300,19 @@ async function submit(event) {
   opacity: 0.5;
   cursor: not-allowed;
   animation: none;
+}
+
+.auth-switch {
+  display: block;
+  margin: 8px auto 0;
+  text-align: center;
+  color: #5b8dbf;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.auth-switch:hover {
+  color: #2c4a6e;
 }
 
 .error-text {

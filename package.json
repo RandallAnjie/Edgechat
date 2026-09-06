@@ -16,16 +16,21 @@
 		"build:demo": "vite build --config frontend/vite.demo.config.js",
 		"build:capacitor:web": "vite build --config frontend/vite.capacitor.config.js",
 		"build": "npm run build:frontend",
+		"embed:frontend": "node scripts/embed-frontend.mjs",
+		"bundle:rf": "node scripts/bundle-rf-worker.mjs",
+		"build:rf": "npm run build:frontend && npm run embed:frontend && npm run bundle:rf",
+		"rf:provision": "node scripts/rf-provision.mjs",
 		"capacitor:sync": "npm run build:capacitor:web && cd capacitor && npx cap sync android",
 		"build:capacitor": "npm run capacitor:sync && node capacitor/scripts/run-gradle.mjs",
 		"open:capacitor:android": "cd capacitor && npx cap open android",
 		"biome:write": "biome check --write .",
 		"biome:check": "biome check .",
 		"biome:ci": "biome ci .",
-		"check": "npm run biome:ci && npm run build",
-		"deploy": "npm run build && wrangler deploy",
-		"deploy:demo": "npm run build:demo && wrangler deploy --config wrangler.demo.toml",
-		"d1:apply": "wrangler d1 execute cfchat-db --file ./worker/schema.sql"
+		"check": "npm run biome:ci && npm run build:rf",
+		"deploy": "npm run build:rf && rrangler deploy",
+		"deploy:demo": "node -e \"console.error('Disabled: official wrangler to Cloudflare is not a delivery path. Use npm run deploy (rrangler).'); process.exit(1)\"",
+		"d1:apply": "rrangler d1 execute edgechat-db --file ./worker/schema.sql",
+		"d1:migrate": "rrangler d1 migrations apply edgechat-db --dir worker/migrations"
 	},
 	"dependencies": {
 		"@capacitor/android": "^8.5.1",
@@ -36,12 +41,13 @@
 		"vue-router": "^4.5.1"
 	},
 	"devDependencies": {
+		"@bigrandall/rrangler": "0.4.0",
 		"@biomejs/biome": "2.4.11",
 		"@capacitor/cli": "^8.5.1",
 		"@vitejs/plugin-vue": "^6.0.8",
+		"esbuild": "^0.27.7",
 		"sql.js": "1.14.2",
-		"vite": "^8.2.1",
-		"wrangler": "^4.11.1"
+		"vite": "^8.2.1"
 	},
 	"overrides": {
 		"undici": "7.29.0"

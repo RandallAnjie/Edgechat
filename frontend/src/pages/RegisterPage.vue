@@ -23,6 +23,7 @@ const form = reactive({
 });
 
 const token = computed(() => String(route.params.token || '').trim());
+const isPublicRegister = computed(() => !token.value);
 
 const usernameInput = ref(null);
 const displayNameInput = ref(null);
@@ -65,6 +66,15 @@ async function submit() {
   loading.value = true;
   error.value = '';
   try {
+    if (isPublicRegister.value) {
+      await store.register({
+        username: form.username,
+        displayName: form.displayName || form.username,
+        password: form.password
+      });
+      router.push('/');
+      return;
+    }
     await api.registerWithInvite(token.value, form);
     router.push({ name: 'login', query: { registered: '1' } });
   } catch (currentError) {
@@ -75,7 +85,9 @@ async function submit() {
 }
 
 onMounted(() => {
-  loadInvite();
+  if (!isPublicRegister.value) {
+    loadInvite();
+  }
 });
 </script>
 
@@ -84,7 +96,7 @@ onMounted(() => {
     <LanguageSwitch class="login-language-switch" />
     <div class="login-container">
       <div class="title-group">
-        <h1 class="welcome-text">{{ t('auth.welcomeBack') }}</h1>
+        <h1 class="welcome-text">{{ isPublicRegister ? t('auth.createAccount') : t('auth.welcomeBack') }}</h1>
         <h2 class="brand-name">{{ store.site.siteName }}</h2>
       </div>
 
@@ -92,7 +104,7 @@ onMounted(() => {
       <p v-else-if="invite?.note" class="info-text">{{ t('auth.invitationNote', { note: invite.note }) }}</p>
       <p v-if="error" class="error-text">{{ error }}</p>
 
-      <form v-if="invite && !error" class="login-form" @submit.prevent="submit">
+      <form v-if="(isPublicRegister || invite) && !validating" class="login-form" @submit.prevent="submit">
         <div class="input-wrapper">
           <span ref="usernameCursor" class="custom-cursor"></span>
           <input
@@ -141,6 +153,7 @@ onMounted(() => {
         <button class="login-btn" :disabled="loading" type="submit">
           {{ loading ? t('auth.registering') : t('auth.completeRegistration') }}
         </button>
+        <router-link class="auth-switch" to="/login">{{ t('auth.haveAccount') }}</router-link>
       </form>
     </div>
   </div>
@@ -330,6 +343,19 @@ onMounted(() => {
   opacity: 0.5;
   cursor: not-allowed;
   animation: none;
+}
+
+.auth-switch {
+  display: block;
+  margin: 8px auto 0;
+  text-align: center;
+  color: #5b8dbf;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.auth-switch:hover {
+  color: #2c4a6e;
 }
 
 .error-text {

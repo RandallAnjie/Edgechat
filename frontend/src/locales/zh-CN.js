@@ -42,6 +42,8 @@ export default {
   'auth.confirmPassword': '确认密码',
   'auth.signingIn': '登录中...',
   'auth.signIn': '登录',
+  'auth.createAccount': '创建账号',
+  'auth.haveAccount': '已有账号？去登录',
   'auth.validatingInvite': '正在验证注册链接...',
   'auth.invitationNote': '邀请说明：{note}',
   'auth.registering': '注册中...',

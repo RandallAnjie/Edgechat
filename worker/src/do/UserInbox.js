@@ -4,11 +4,20 @@ import { durableObjectHealth } from '../maintenance/do-health.ts';
 export class UserInbox {
   constructor(state) {
     this.state = state;
+    // Ordinary DO WebSocket only. RandallFlare has no hibernation API
+    // (acceptWebSocket / getWebSockets / serializeAttachment).
     this.connections = new Set();
+  }
 
-    for (const socket of this.state.getWebSockets()) {
-      this.connections.add(socket);
-    }
+  attachSocket(server) {
+    server.accept();
+    this.connections.add(server);
+    server.addEventListener('close', () => {
+      this.connections.delete(server);
+    });
+    server.addEventListener('error', () => {
+      this.connections.delete(server);
+    });
   }
 
   broadcast(packet) {
@@ -38,9 +47,7 @@ export class UserInbox {
 
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
-      this.state.acceptWebSocket(server);
-      server.serializeAttachment({ userId });
-      this.connections.add(server);
+      this.attachSocket(server);
       server.send(JSON.stringify({ protocolVersion: 1, type: 'ready' }));
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -56,13 +63,5 @@ export class UserInbox {
     }
 
     return new Response('Not Found', { status: 404 });
-  }
-
-  webSocketClose(ws) {
-    this.connections.delete(ws);
-  }
-
-  webSocketError(ws) {
-    this.connections.delete(ws);
   }
 }

@@ -16,6 +16,10 @@ export function createD1Adapter(database) {
         statement.free();
         return { results };
       },
+      async first() {
+        const { results } = await this.all();
+        return results[0] || null;
+      },
       async run() {
         const statement = database.prepare(sql);
         statement.run(bindings);

@@ -9,6 +9,7 @@
 		"includes": [
 			"**",
 			"!dist",
+			"!dist-rf",
 			"!frontend/dist",
 			"!**/generated",
 			"!**/*.min.js"
