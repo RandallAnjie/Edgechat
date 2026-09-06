@@ -11,7 +11,7 @@ A single Worker that:
 1. Serves `public/index.html` from the Worker (no Pages, no CF `[assets]`).
 2. Upgrades `GET /ws` to a WebSocket on one SQLite Durable Object class, `EchoRoom`, bound as `ECHO_ROOM`.
 3. Probes D1 on `GET /api/health` and `GET /api/d1` (`SELECT 1`).
-4. Probes R2 on `GET /api/r2` (`put` then `get` key `pilot/probe.txt`). Unbound `FILES` returns **503** and never a fake 200.
+4. Probes R2 on `GET /api/r2` (`put` then `get` key `pilot/probe.txt`). **200 only when get text equals the put payload.** Unbound `FILES`, missed get, unreadable body, or text mismatch → **503** `{ ok: false }`. Never `200` + `ok: false`.
 
 The browser page opens `/ws`, keeps the socket, echoes, shows a ≥30s hold timer, logs RTT (including p95), and hits `/api/health`.
 
@@ -22,7 +22,7 @@ The browser page opens `/ws`, keeps the socket, echoes, shows a ≥30s hold time
 | `GET` | `/` or `/index.html` | 200 HTML echo page | — |
 | `GET` | `/api/health` | 200 JSON `{ ok: true, service, d1 }` | Worker crash only. Unbound DB still 200 with `d1.ok=false`. |
 | `GET` | `/api/d1` | 200 JSON `{ ok: true, result: 1 }` when `DB` is bound and `SELECT 1` works | 503 if `DB` is missing or the query fails |
-| `GET` | `/api/r2` | 200 JSON `{ ok: true, key, bytes }` after put+get of `pilot/probe.txt` | **503** if `FILES` is unbound or put/get fails. Never fake success. |
+| `GET` | `/api/r2` | 200 JSON `{ ok: true, key, bytes }` **only** after put+get of `pilot/probe.txt` and the get **text matches** | **503** `{ ok: false }` if `FILES` is unbound, get misses, body is unreadable, or text mismatches. **Never 200 + ok:false.** |
 | `GET` | `/ws` | 101 WebSocket via `EchoRoom` | 503 if `ECHO_ROOM` is unbound; 426 if the request is not a WebSocket upgrade |
 
 `/api/health` always runs `SELECT 1` when `DB` is bound.

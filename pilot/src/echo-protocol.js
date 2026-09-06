@@ -54,8 +54,17 @@ export function buildEchoReply(rawMessage, now = Date.now()) {
 }
 
 export function jsonResponse(body, status = 200) {
+	const ok = body && typeof body === "object" && body.ok === true;
+	let code = status;
+	if (code == null) {
+		code = ok ? 200 : 503;
+	}
+	// Never HTTP 200 with top-level ok:false (Architect/TPM evidence conflict).
+	if (code === 200 && !ok) {
+		code = 503;
+	}
 	return new Response(JSON.stringify(body), {
-		status,
+		status: code,
 		headers: {
 			"content-type": "application/json; charset=utf-8",
 			"cache-control": "no-store",

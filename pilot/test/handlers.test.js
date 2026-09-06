@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { handleRequest } from "../src/handlers.js";
+import { handleRequest, r2ProbeResponse } from "../src/handlers.js";
+import { jsonResponse } from "../src/echo-protocol.js";
 import { INDEX_HTML } from "../src/static-html.js";
 
 function createFakeD1(result = { ok: 1 }) {
@@ -126,6 +127,64 @@ test("GET /api/r2 never returns 200 on put/get failure", async () => {
 	});
 	assert.equal(response.status, 503);
 	assert.equal((await response.json()).ok, false);
+});
+
+test("GET /api/r2 is 503 with ok:false when get text does not match put", async () => {
+	const response = await handleRequest(new Request("https://pilot.test/api/r2"), {
+		FILES: {
+			async put() {},
+			async get() {
+				return { async text() { return "stale-or-wrong"; } };
+			},
+		},
+	});
+	assert.equal(response.status, 503);
+	const body = await response.json();
+	assert.equal(body.ok, false);
+	assert.match(body.error, /mismatch/);
+});
+
+test("GET /api/r2 is 503 when get returns an ok:false envelope instead of the object body", async () => {
+	const response = await handleRequest(new Request("https://pilot.test/api/r2"), {
+		FILES: {
+			async put() {},
+			async get() {
+				return { ok: false, error: "not found" };
+			},
+		},
+	});
+	assert.equal(response.status, 503);
+	assert.equal((await response.json()).ok, false);
+});
+
+test("GET /api/r2 never pairs HTTP 200 with ok:false", async () => {
+	const cases = [
+		await handleRequest(new Request("https://pilot.test/api/r2"), {}),
+		await handleRequest(new Request("https://pilot.test/api/r2"), {
+			FILES: {
+				async put() {},
+				async get() {
+					return { async text() { return "nope"; } };
+				},
+			},
+		}),
+		await handleRequest(new Request("https://pilot.test/api/r2"), {
+			FILES: createFakeR2(),
+		}),
+		r2ProbeResponse({ matched: false, error: "mismatch" }),
+		r2ProbeResponse({ matched: true, payload: "a", text: "b", key: "pilot/probe.txt" }),
+		jsonResponse({ ok: false, error: "should not be 200" }, 200),
+		jsonResponse({ ok: false, error: "missing status" }),
+	];
+	for (const response of cases) {
+		const body = await response.clone().json();
+		assert.notEqual(response.status === 200 && body.ok === false, true);
+		if (body.ok === true) {
+			assert.equal(response.status, 200);
+		} else {
+			assert.notEqual(response.status, 200);
+		}
+	}
 });
 
 test("GET /ws forwards to EchoRoom when bound and 503 when not", async () => {

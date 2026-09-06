@@ -46,16 +46,57 @@ export async function probeD1(env) {
 	}
 }
 
+export async function readR2ObjectText(object) {
+	if (object == null) {
+		return null;
+	}
+	if (typeof object === "string") {
+		return object;
+	}
+	if (typeof object.text === "function") {
+		const text = await object.text();
+		return typeof text === "string" ? text : text == null ? null : String(text);
+	}
+	if (typeof object.arrayBuffer === "function") {
+		return new TextDecoder().decode(await object.arrayBuffer());
+	}
+	if (object instanceof ArrayBuffer || ArrayBuffer.isView(object)) {
+		return new TextDecoder().decode(object);
+	}
+	return null;
+}
+
+function r2Fail(error) {
+	return { matched: false, error };
+}
+
+export function r2ProbeResponse(result) {
+	const matched =
+		result?.matched === true &&
+		typeof result.payload === "string" &&
+		result.text === result.payload;
+	if (matched) {
+		return jsonResponse(
+			{
+				ok: true,
+				key: result.key,
+				bytes: result.payload.length,
+			},
+			200,
+		);
+	}
+	return jsonResponse(
+		{
+			ok: false,
+			error: result?.error || "R2 put/get text did not match",
+		},
+		503,
+	);
+}
+
 export async function probeR2(env) {
 	if (!isFilesBound(env)) {
-		return {
-			ok: false,
-			status: 503,
-			body: {
-				ok: false,
-				error: "FILES R2 binding is not configured",
-			},
-		};
+		return r2Fail("FILES R2 binding is not configured");
 	}
 
 	const key = PILOT_R2_KEY;
@@ -65,44 +106,18 @@ export async function probeR2(env) {
 		await env.FILES.put(key, payload);
 		const object = await env.FILES.get(key);
 		if (!object) {
-			return {
-				ok: false,
-				status: 503,
-				body: {
-					ok: false,
-					error: `R2 get missed key ${key} after put`,
-				},
-			};
+			return r2Fail(`R2 get missed key ${key} after put`);
 		}
-		const text = typeof object.text === "function" ? await object.text() : String(object);
+		const text = await readR2ObjectText(object);
+		if (text == null) {
+			return r2Fail("R2 get body was unreadable after put");
+		}
 		if (text !== payload) {
-			return {
-				ok: false,
-				status: 503,
-				body: {
-					ok: false,
-					error: "R2 get payload mismatch after put",
-				},
-			};
+			return r2Fail("R2 get payload mismatch after put");
 		}
-		return {
-			ok: true,
-			status: 200,
-			body: {
-				ok: true,
-				key,
-				bytes: payload.length,
-			},
-		};
+		return { matched: true, key, payload, text };
 	} catch (error) {
-		return {
-			ok: false,
-			status: 503,
-			body: {
-				ok: false,
-				error: error instanceof Error ? error.message : String(error),
-			},
-		};
+		return r2Fail(error instanceof Error ? error.message : String(error));
 	}
 }
 
@@ -143,8 +158,7 @@ export async function handleRequest(request, env) {
 	}
 
 	if (request.method === "GET" && path === "/api/r2") {
-		const r2 = await probeR2(env);
-		return jsonResponse(r2.body, r2.status);
+		return r2ProbeResponse(await probeR2(env));
 	}
 
 	if (path === "/ws") {

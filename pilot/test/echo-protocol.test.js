@@ -7,6 +7,7 @@ import {
 	buildEchoReply,
 	buildReadyMessage,
 	decodeSocketMessage,
+	jsonResponse,
 } from "../src/echo-protocol.js";
 
 test("ready frame never claims hibernation was verified", () => {
@@ -44,4 +45,17 @@ test("echo JSON and raw text come back so the client can measure RTT", () => {
 	assert.equal(buildEchoReply("plain-text"), "plain-text");
 	assert.equal(decodeSocketMessage(new TextEncoder().encode("bin").buffer), "bin");
 	assert.equal(PILOT_R2_KEY, "pilot/probe.txt");
+});
+
+test("jsonResponse never emits HTTP 200 with ok:false", async () => {
+	const coerced = jsonResponse({ ok: false, error: "mismatch" }, 200);
+	assert.equal(coerced.status, 503);
+	assert.equal((await coerced.json()).ok, false);
+
+	const missingStatus = jsonResponse({ ok: false, error: "unbound" });
+	assert.equal(missingStatus.status, 503);
+
+	const success = jsonResponse({ ok: true, key: "pilot/probe.txt" }, 200);
+	assert.equal(success.status, 200);
+	assert.equal((await success.json()).ok, true);
 });
