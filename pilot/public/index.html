@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>edgechat-pilot</title>
+	<style>
+		:root {
+			color-scheme: dark;
+			--bg: #10141c;
+			--panel: #181e29;
+			--ink: #e8eef8;
+			--muted: #93a0b5;
+			--line: #2a3344;
+			--ok: #3dd68c;
+			--bad: #ff6b6b;
+			--warn: #f5c16c;
+			--accent: #7aa2ff;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			font: 15px/1.45 ui-sans-serif, system-ui, sans-serif;
+			background: var(--bg);
+			color: var(--ink);
+		}
+		main {
+			max-width: 880px;
+			margin: 0 auto;
+			padding: 28px 18px 48px;
+		}
+		h1 { font-size: 1.4rem; margin: 0 0 4px; }
+		.sub { color: var(--muted); margin: 0 0 22px; }
+		.grid {
+			display: grid;
+			gap: 14px;
+			grid-template-columns: 1fr;
+		}
+		@media (min-width: 760px) {
+			.grid { grid-template-columns: 1fr 1fr; }
+		}
+		.card {
+			background: var(--panel);
+			border: 1px solid var(--line);
+			border-radius: 12px;
+			padding: 14px 16px;
+		}
+		.card h2 {
+			margin: 0 0 10px;
+			font-size: 0.95rem;
+			color: var(--muted);
+			font-weight: 600;
+		}
+		.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+		button, input {
+			font: inherit;
+			border-radius: 8px;
+			border: 1px solid var(--line);
+			background: #10151f;
+			color: var(--ink);
+			padding: 7px 10px;
+		}
+		button { cursor: pointer; }
+		button:hover { border-color: var(--accent); }
+		input { flex: 1; min-width: 140px; }
+		.pill {
+			display: inline-block;
+			padding: 2px 8px;
+			border-radius: 999px;
+			border: 1px solid var(--line);
+			font-size: 12px;
+		}
+		.ok { color: var(--ok); }
+		.bad { color: var(--bad); }
+		.warn { color: var(--warn); }
+		pre, .log {
+			margin: 10px 0 0;
+			max-height: 220px;
+			overflow: auto;
+			background: #0c1017;
+			border-radius: 8px;
+			padding: 8px 10px;
+			font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+			white-space: pre-wrap;
+			word-break: break-word;
+		}
+		.metrics { color: var(--muted); font-size: 13px; margin-top: 8px; }
+		.wide { grid-column: 1 / -1; }
+	</style>
+</head>
+<body>
+	<main>
+		<h1>edgechat-pilot</h1>
+		<p class="sub">RandallFlare probe for T-20260906-01. Worker-served static page, Durable Object echo, D1 and R2 checks.</p>
+		<div class="grid">
+			<section class="card">
+				<h2>WebSocket /ws</h2>
+				<div class="row">
+					<span id="ws-state" class="pill warn">connecting</span>
+					<span id="hold" class="pill">hold 0s / 30s</span>
+					<span id="hibernation" class="pill">hibernation: unknown</span>
+				</div>
+				<div class="metrics" id="rtt-metrics">RTT: waiting for samples</div>
+				<div class="row" style="margin-top:10px">
+					<input id="echo-input" type="text" value="hello" maxlength="500">
+					<button id="echo-send" type="button">Echo</button>
+				</div>
+				<div class="log" id="ws-log"></div>
+			</section>
+			<section class="card">
+				<h2>Probes</h2>
+				<div class="row">
+					<button id="health-btn" type="button">GET /api/health</button>
+					<button id="d1-btn" type="button">GET /api/d1</button>
+					<button id="r2-btn" type="button">GET /api/r2</button>
+				</div>
+				<pre id="probe-out">loading health…</pre>
+			</section>
+			<section class="card wide">
+				<h2>How to read this page</h2>
+				<p class="sub" style="margin:0">Stay on this page at least 30 seconds. The hold pill turns green after 30s with the socket still open. Each ping/echo logs RTT in the console as <code>[edgechat-pilot] rtt=…ms</code>. p95 is computed from collected samples.</p>
+			</section>
+		</div>
+	</main>
+	<script>
+		(function () {
+			var samples = [];
+			var openedAt = 0;
+			var held = false;
+			var socket = null;
+			var pending = {};
+			var seq = 0;
+			var logEl = document.getElementById("ws-log");
+			var stateEl = document.getElementById("ws-state");
+			var holdEl = document.getElementById("hold");
+			var hibEl = document.getElementById("hibernation");
+			var metricsEl = document.getElementById("rtt-metrics");
+			var probeEl = document.getElementById("probe-out");
+
+			function nowMs() {
+				return Date.now();
+			}
+
+			function logLine(text) {
+				var time = new Date().toISOString().slice(11, 23);
+				logEl.textContent = time + "  " + text + "\n" + logEl.textContent;
+			}
+
+			function percentile(values, p) {
+				if (!values.length) return null;
+				var sorted = values.slice().sort(function (a, b) { return a - b; });
+				var idx = Math.max(0, Math.ceil(sorted.length * p / 100) - 1);
+				return sorted[idx];
+			}
+
+			function renderMetrics() {
+				if (!samples.length) {
+					metricsEl.textContent = "RTT: waiting for samples";
+					return;
+				}
+				var p50 = percentile(samples, 50);
+				var p95 = percentile(samples, 95);
+				var last = samples[samples.length - 1];
+				metricsEl.textContent = "RTT last " + last + "ms · p50 " + p50 + "ms · p95 " + p95 + "ms · n=" + samples.length;
+			}
+
+			function recordRtt(rtt, kind, id) {
+				samples.push(rtt);
+				renderMetrics();
+				console.log("[edgechat-pilot] rtt=" + rtt + "ms kind=" + kind + " id=" + id + " p95=" + percentile(samples, 95) + "ms n=" + samples.length);
+				logLine(kind + " rtt=" + rtt + "ms id=" + id);
+			}
+
+			function setState(text, cls) {
+				stateEl.textContent = text;
+				stateEl.className = "pill " + cls;
+			}
+
+			function wsUrl() {
+				var proto = location.protocol === "https:" ? "wss:" : "ws:";
+				return proto + "//" + location.host + "/ws";
+			}
+
+			function sendPing() {
+				if (!socket || socket.readyState !== 1) return;
+				var id = "p" + (++seq);
+				var clientSentAt = nowMs();
+				pending[id] = { clientSentAt: clientSentAt, kind: "ping" };
+				socket.send(JSON.stringify({ type: "ping", id: id, clientSentAt: clientSentAt }));
+			}
+
+			function connect() {
+				setState("connecting", "warn");
+				socket = new WebSocket(wsUrl());
+				socket.addEventListener("open", function () {
+					openedAt = nowMs();
+					setState("open", "ok");
+					logLine("connected " + wsUrl());
+					sendPing();
+				});
+				socket.addEventListener("message", function (event) {
+					var data = event.data;
+					try {
+						var msg = JSON.parse(data);
+						if (msg.type === "ready") {
+							var used = msg.hibernationUsed ? "used API" : "normal accept";
+							var verified = msg.hibernationVerified ? "verified" : "NOT VERIFIED";
+							hibEl.textContent = "hibernation: " + used + " / " + verified;
+							hibEl.className = "pill warn";
+							logLine("ready hibernationUsed=" + msg.hibernationUsed + " hibernationVerified=" + msg.hibernationVerified);
+							return;
+						}
+						if ((msg.type === "pong" || msg.type === "echo") && msg.id && pending[msg.id]) {
+							var info = pending[msg.id];
+							delete pending[msg.id];
+							recordRtt(nowMs() - info.clientSentAt, msg.type, msg.id);
+							return;
+						}
+						logLine("recv " + data);
+					} catch (err) {
+						logLine("recv " + data);
+					}
+				});
+				socket.addEventListener("close", function () {
+					setState("closed", "bad");
+					logLine("socket closed");
+				});
+				socket.addEventListener("error", function () {
+					setState("error", "bad");
+					logLine("socket error");
+				});
+			}
+
+			setInterval(function () {
+				if (!openedAt || !socket || socket.readyState !== 1) return;
+				var elapsed = Math.floor((nowMs() - openedAt) / 1000);
+				holdEl.textContent = "hold " + elapsed + "s / 30s";
+				if (elapsed >= 30 && !held) {
+					held = true;
+					holdEl.className = "pill ok";
+					logLine("held open >= 30s");
+					console.log("[edgechat-pilot] held>=30s samples=" + samples.length + " p95=" + percentile(samples, 95) + "ms");
+				}
+				sendPing();
+			}, 1000);
+
+			document.getElementById("echo-send").addEventListener("click", function () {
+				if (!socket || socket.readyState !== 1) return;
+				var id = "e" + (++seq);
+				var payload = document.getElementById("echo-input").value;
+				var clientSentAt = nowMs();
+				pending[id] = { clientSentAt: clientSentAt, kind: "echo" };
+				socket.send(JSON.stringify({ type: "echo", id: id, payload: payload, clientSentAt: clientSentAt }));
+			});
+
+			async function fetchProbe(path) {
+				try {
+					var res = await fetch(path, { cache: "no-store" });
+					var text = await res.text();
+					var line = path + " " + res.status + "\n" + text;
+					probeEl.textContent = line;
+					console.log("[edgechat-pilot] " + path + " status=" + res.status + " body=" + text);
+					return res.status;
+				} catch (error) {
+					probeEl.textContent = path + " failed\n" + error;
+					console.log("[edgechat-pilot] " + path + " error", error);
+					return 0;
+				}
+			}
+
+			document.getElementById("health-btn").addEventListener("click", function () { fetchProbe("/api/health"); });
+			document.getElementById("d1-btn").addEventListener("click", function () { fetchProbe("/api/d1"); });
+			document.getElementById("r2-btn").addEventListener("click", function () { fetchProbe("/api/r2"); });
+
+			connect();
+			fetchProbe("/api/health");
+		})();
+	</script>
+</body>
+</html>

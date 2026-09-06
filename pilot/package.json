@@ -1,0 +1,19 @@
+{
+	"name": "edgechat-pilot",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "RandallFlare pilot Worker for T-20260906-01. Not the full Edgechat app.",
+	"scripts": {
+		"test": "node --test test/*.test.js",
+		"preview": "node scripts/local-preview.mjs",
+		"deploy": "npx --yes @bigrandall/rrangler@0.4.0 deploy",
+		"dev": "npx --yes @bigrandall/rrangler@0.4.0 dev --port 8787",
+		"d1:apply": "npx --yes @bigrandall/rrangler@0.4.0 d1 migrations apply edgechat-pilot-db --dir migrations",
+		"d1:create": "npx --yes @bigrandall/rrangler@0.4.0 d1 create edgechat-pilot-db",
+		"r2:create": "npx --yes @bigrandall/rrangler@0.4.0 r2 bucket create edgechat-pilot-files"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}
