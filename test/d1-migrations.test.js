@@ -235,24 +235,18 @@ test("Windows CRLF 迁移校验值会在 Linux Actions 中自动归一化", asyn
 	assert.match(plan.sql, /UPDATE edgechat_schema_migrations/);
 });
 
-test("部署工作流每次发布都在 Worker 之前准备并执行 D1 迁移", () => {
+test("D1 全量 schema 与 migrations 由 rrangler 脚本交付，CI 不再走 Cloudflare 工作流", () => {
 	const workflow = readFileSync(
 		new URL("../.github/workflows/deploy-worker.yml", import.meta.url),
 		"utf8",
 	).replaceAll("\r\n", "\n");
-	const prepareIndex = workflow.indexOf("      - name: Prepare D1 migrations\n");
-	const applyIndex = workflow.indexOf("      - name: Apply D1 migrations\n");
-	const deployIndex = workflow.indexOf("      - name: Deploy worker\n");
-
-	assert.ok(prepareIndex > 0);
-	assert.ok(applyIndex > prepareIndex);
-	assert.ok(deployIndex > applyIndex);
-	assert.doesNotMatch(
-		workflow.slice(prepareIndex, workflow.indexOf("      - name: ", prepareIndex + 20)),
-		/d1_created == 'true'/,
+	const packageJson = JSON.parse(
+		readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 	);
-	assert.match(workflow, /prepare-d1-migrations\.mjs/);
-	assert.match(workflow, /\.tmp\/edgechat-d1-migrations\.sql/);
+	assert.match(packageJson.scripts["d1:apply"], /rrangler d1 execute/);
+	assert.match(packageJson.scripts["d1:migrate"], /worker\/migrations/);
+	assert.doesNotMatch(workflow, /Prepare D1 migrations|Apply D1 migrations|npx wrangler d1/);
+	assert.match(workflow, /npm run build:rf/);
 });
 
 test("CI Wrangler 配置保留收件箱 Durable Object 与管理员变量", () => {

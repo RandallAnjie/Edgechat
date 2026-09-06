@@ -83,7 +83,7 @@ app.get('/api/site', async (c) => {
   return c.json({ site });
 });
 
-app.all('/api/integrations/telegram/*', (c) => errorResponse('Telegram Bridge 未配置', 503));
+app.all('/api/integrations/telegram/*', () => errorResponse('Telegram Bridge 未配置', 503));
 
 app.get('/api/register-links/:token', async (c) => {
   const token = String(c.req.param('token') || '').trim();
