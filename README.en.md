@@ -1,3 +1,5 @@
+> RandallFlare fork (`T-20260906-01`): deploy with `@bigrandall/rrangler` only. Operator guide: [README.md](README.md). Public attribution is Randall.
+
 <div align="center">
   <img src="Edgechat.png" alt="EdgeChat" width="640" />
 

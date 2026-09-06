@@ -1,4 +1,4 @@
-import { Database, Gauge, Send, Settings, UserCog, UserPlus, Wrench } from '@lucide/vue';
+import { Database, Gauge, Settings, UserCog, UserPlus, Wrench } from '@lucide/vue';
 
 export const adminNavigation = [
   {
@@ -34,13 +34,6 @@ export const adminNavigation = [
     ]
   },
   {
-    id: 'telegram',
-    labelKey: 'admin.nav.telegram',
-    descriptionKey: 'admin.nav.telegramDescription',
-    to: '/admin/telegram',
-    icon: Send
-  },
-  {
     id: 'site',
     labelKey: 'admin.nav.site',
     descriptionKey: 'admin.nav.siteDescription',
@@ -66,7 +59,6 @@ export const adminRouteIcons = {
   users: UserCog,
   storage: Database,
   invites: UserPlus,
-  telegram: Send,
   site: Settings,
   maintenance: Wrench
 };

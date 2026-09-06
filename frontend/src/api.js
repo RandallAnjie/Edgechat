@@ -55,6 +55,13 @@ async function request(path, options = {}) {
 }
 
 export default {
+  register(payload) {
+    return request('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  },
   login(credentials) {
     return request('/auth/login', {
       method: 'POST',

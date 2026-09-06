@@ -104,6 +104,11 @@ function addKey(keys, keyId, encodedKey) {
   });
 }
 
+export function hasEncryptionKeyring(source) {
+  const keyringSource = getKeyringSource(source);
+  return Boolean(keyringSource.legacyRaw || keyringSource.generatedKeys.length > 0);
+}
+
 export function loadEncryptionKeyring(source) {
   const keyringSource = getKeyringSource(source);
   if (!keyringSource.legacyRaw && keyringSource.generatedKeys.length === 0) {
@@ -187,6 +192,10 @@ export async function encryptMessageContent(
   const cleanPlaintext = String(plaintext || '');
   if (!cleanPlaintext) {
     return '';
+  }
+
+  if (!hasEncryptionKeyring(source)) {
+    return cleanPlaintext;
   }
 
   const keyring = loadEncryptionKeyring(source);
@@ -354,6 +363,9 @@ export function getAttachmentEnvelopeKeyId(value) {
 
 export async function encryptAttachment(source, value, objectKey) {
   const plaintext = toBytes(value);
+  if (!hasEncryptionKeyring(source)) {
+    return plaintext;
+  }
   const keyring = loadEncryptionKeyring(source);
   const keyIdBytes = encoder.encode(keyring.activeKeyId);
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));

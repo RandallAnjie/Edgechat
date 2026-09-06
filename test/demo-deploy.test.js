@@ -28,33 +28,29 @@ const packageJson = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 );
 
-test('demo workflow is manual-only and uses dedicated Cloudflare secrets', () => {
+test('demo workflow is manual-only and does not deploy with official wrangler', () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /\n\s+push:/);
-  assert.match(workflow, /secrets\.DEMO_CLOUDFLARE_ACCOUNT_ID/);
-  assert.match(workflow, /secrets\.DEMO_CLOUDFLARE_API_TOKEN/);
-  assert.doesNotMatch(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/);
+  assert.doesNotMatch(workflow, /npx wrangler|wrangler deploy/);
   assert.doesNotMatch(workflow, /ensure-cloudflare-resources|prepare-d1-migrations|prepare-worker-encryption-secret/);
 });
 
-test('demo Wrangler config serves only its isolated static build', () => {
+test('demo Wrangler config is leftover static isolation, not a delivery path', () => {
   assert.match(wrangler, /name = "edgechat-demo"/);
   assert.match(wrangler, /directory = "\.\/frontend\/demo-dist"/);
   assert.doesNotMatch(wrangler, /d1_databases|kv_namespaces|r2_buckets|durable_objects|triggers|main =/);
-  assert.equal(
-    packageJson.scripts['deploy:demo'],
-    'npm run build:demo && wrangler deploy --config wrangler.demo.toml'
-  );
+  assert.match(packageJson.scripts['deploy:demo'], /Disabled/);
 });
 
-test('production Action cannot build or deploy demo assets', () => {
-  assert.match(productionWorkflow, /run: npm run build\s/);
+test('production Action cannot build or deploy demo assets and uses rrangler', () => {
+  assert.match(productionWorkflow, /npm run build:rf/);
   assert.doesNotMatch(
     productionWorkflow,
     /build:demo|wrangler\.demo\.toml|edgechat-demo|DEMO_CLOUDFLARE/
   );
   assert.equal(packageJson.scripts.build, 'npm run build:frontend');
-  assert.equal(packageJson.scripts.deploy, 'npm run build && wrangler deploy');
+  assert.match(packageJson.scripts.deploy, /rrangler deploy/);
+  assert.doesNotMatch(packageJson.scripts.deploy, /\bwrangler\b/);
   assert.match(productionVite, /outDir: resolve\(dirname, 'dist'\)/);
   assert.match(productionVite, /'globalThis\.__EDGECHAT_DEMO__': 'false'/);
   assert.match(demoVite, /'globalThis\.__EDGECHAT_DEMO__': 'true'/);

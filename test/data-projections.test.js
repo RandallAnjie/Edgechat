@@ -219,7 +219,7 @@ test("站点设置 projection 使用稳定默认值", async () => {
 	});
 	const defaults = createQueryDb([]);
 	assert.deepEqual(await getSiteSettings(defaults.db), {
-		siteName: "Edgechat",
+		siteName: "Randall",
 		siteIconUrl: "",
 	});
 });

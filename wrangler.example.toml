@@ -1,3 +1,5 @@
+# NOT a RandallFlare delivery path. Official wrangler → Cloudflare is disabled.
+# Vars whitelist + binding names for T-20260906-01. Deploy with rrangler.json only.
 # Legacy Worker service name kept to avoid creating a new production Worker during rename cleanup.
 name = "cfchat"
 main = "worker/src/index.js"

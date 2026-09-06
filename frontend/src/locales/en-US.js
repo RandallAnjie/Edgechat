@@ -42,6 +42,8 @@ export default {
   'auth.confirmPassword': 'Confirm password',
   'auth.signingIn': 'Signing in...',
   'auth.signIn': 'Sign in',
+  'auth.createAccount': 'Create account',
+  'auth.haveAccount': 'Already have an account? Sign in',
   'auth.validatingInvite': 'Validating invitation link...',
   'auth.invitationNote': 'Invitation note: {note}',
   'auth.registering': 'Creating account...',

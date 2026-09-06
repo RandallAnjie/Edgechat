@@ -147,9 +147,11 @@ test("demo maintenance report uses the generated manifest and matches the produc
   assert.equal(report.checks.find((check) => check.id === "schema").schema.status, "ok");
 });
 
-test("Deploy Worker verifies D1 after apply and before worker deploy", () => {
+test("RandallFlare CI builds the worker bundle and does not apply D1 via Cloudflare Wrangler", () => {
   const workflow = readFileSync(new URL("../.github/workflows/deploy-worker.yml", import.meta.url), "utf8");
-  assert.ok(workflow.indexOf("name: Apply D1 migrations") < workflow.indexOf("name: Verify D1 schema contract"));
-  assert.ok(workflow.indexOf("name: Verify D1 schema contract") < workflow.indexOf("name: Deploy worker"));
-  assert.match(workflow, /prepare-d1-migrations\.mjs --verify/);
+  const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.match(workflow, /npm run build:rf/);
+  assert.doesNotMatch(workflow, /npx wrangler|Apply D1 migrations|Verify D1 schema contract/);
+  assert.match(packageJson.scripts["d1:apply"], /worker\/schema.sql/);
+  assert.match(packageJson.scripts["d1:migrate"], /worker\/migrations/);
 });

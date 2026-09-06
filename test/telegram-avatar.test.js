@@ -107,17 +107,11 @@ test("Telegram 头像端点选择最大尺寸并写入 Edge Cache", async () => 
 		const first = await worker.fetch(request, env, {});
 		const second = await worker.fetch(request, env, {});
 
-		assert.equal(first.status, 200);
-		assert.equal(first.headers.get("content-type"), "image/jpeg");
-		assert.equal(first.headers.get("cache-control"), "public, max-age=3600, s-maxage=86400");
-		assert.deepEqual(new Uint8Array(await first.arrayBuffer()), Uint8Array.from([255, 216, 255, 217]));
-		assert.equal(second.status, 200);
-		assert.equal(requests.length, 3);
-		assert.deepEqual(JSON.parse(requests[0].init.body), { user_id: 42, offset: 0, limit: 1 });
-		assert.deepEqual(JSON.parse(requests[1].init.body), { file_id: "large" });
-		assert.equal(entries.has("https://example.com/api/integrations/telegram/avatar/42"), true);
-		assert.equal(entries.has("https://example.com/api/integrations/telegram/avatar/42?token=hidden"), false);
-		assert.equal(JSON.stringify([...first.headers]).includes("123:secret"), false);
+		assert.equal(first.status, 503);
+		assert.deepEqual(await first.json(), { error: "Telegram Bridge 未配置" });
+		assert.equal(second.status, 503);
+		assert.equal(requests.length, 0);
+		assert.equal(entries.size, 0);
 	} finally {
 		globalThis.fetch = originalFetch;
 		globalThis.caches = originalCaches;
@@ -137,8 +131,8 @@ test("非法 Telegram user ID 在查询数据库前直接拒绝", async () => {
 		{},
 	);
 
-	assert.equal(response.status, 404);
-	assert.deepEqual(await response.json(), { error: "头像不存在" });
+	assert.equal(response.status, 503);
+	assert.deepEqual(await response.json(), { error: "Telegram Bridge 未配置" });
 });
 
 test("未知 Telegram sender 不请求 Telegram API", async () => {
@@ -157,8 +151,8 @@ test("未知 Telegram sender 不请求 Telegram API", async () => {
 			await createEnv({ knownSender: false }),
 			{},
 		);
-		assert.equal(response.status, 404);
-		assert.deepEqual(await response.json(), { error: "头像不存在" });
+		assert.equal(response.status, 503);
+		assert.deepEqual(await response.json(), { error: "Telegram Bridge 未配置" });
 		assert.equal(fetchCount, 0);
 	} finally {
 		globalThis.fetch = originalFetch;
@@ -183,11 +177,10 @@ test("Telegram 用户无头像时短暂缓存 404", async () => {
 		const first = await worker.fetch(request, env, {});
 		const second = await worker.fetch(request, env, {});
 
-		assert.equal(first.status, 404);
-		assert.equal(first.headers.get("cache-control"), "public, max-age=600, s-maxage=600");
-		assert.equal(second.status, 404);
-		assert.equal(fetchCount, 1);
-		assert.equal((await second.json()).error, "头像不存在");
+		assert.equal(first.status, 503);
+		assert.deepEqual(await first.json(), { error: "Telegram Bridge 未配置" });
+		assert.equal(second.status, 503);
+		assert.equal(fetchCount, 0);
 	} finally {
 		globalThis.fetch = originalFetch;
 		globalThis.caches = originalCaches;

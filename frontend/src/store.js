@@ -22,7 +22,7 @@ const state = reactive({
   token: isDemoMode ? runtimeSessionToken : getStoredToken(),
   session: null,
   site: {
-    siteName: 'Edgechat',
+    siteName: 'Randall',
     siteIconUrl: ''
   }
 });
@@ -34,7 +34,7 @@ function clearAuthState() {
 }
 
 function applySiteMetadata(site) {
-  const siteName = String(site?.siteName || 'Edgechat').trim() || 'Edgechat';
+  const siteName = String(site?.siteName || 'Randall').trim() || 'Randall';
   const siteIconUrl = String(site?.siteIconUrl || '').trim();
   document.title = siteName;
 
@@ -97,6 +97,17 @@ async function login(credentials) {
   setStoredToken(payload.token);
 }
 
+async function register(payload) {
+  const result = await api.register(payload);
+  if (result.token) {
+    state.token = result.token;
+    state.session = result.session;
+    state.ready = true;
+    setStoredToken(result.token);
+  }
+  return result;
+}
+
 async function configureNativeServer(configuredOrigin) {
   if (!isCapacitorAndroid) {
     return '';
@@ -133,7 +144,7 @@ function setSession(session) {
 
 function setSite(site) {
   state.site = {
-    siteName: String(site?.siteName || 'Edgechat').trim() || 'Edgechat',
+    siteName: String(site?.siteName || 'Randall').trim() || 'Randall',
     siteIconUrl: String(site?.siteIconUrl || '').trim()
   };
   applySiteMetadata(state.site);
@@ -160,6 +171,7 @@ export default {
   },
   initialize,
   login,
+  register,
   configureNativeServer,
   logout,
   setSession,

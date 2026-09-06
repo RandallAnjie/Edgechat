@@ -1,3 +1,5 @@
+> RandallFlare fork (`T-20260906-01`): `@bigrandall/rrangler` only. See [README.md](README.md). Attribution: Randall.
+
 <div align="center">
   <img src="Edgechat.png" alt="EdgeChat" width="640" />
 

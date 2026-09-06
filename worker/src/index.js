@@ -17,7 +17,7 @@ import {
   getAvailableRegistrationInvite
 } from './data/registration-invites.js';
 import { getSiteSettings } from './data/site-settings.js';
-import { getUserByUsername, listActiveUsers } from './data/users.js';
+import { countActiveUsers, createUser, getUserByUsername, listActiveUsers } from './data/users.js';
 import { ApiError } from './errors.js';
 import { resolveAvatarKeyUpdate } from './avatar-policy.js';
 import { adminMiddleware, authMiddleware } from './middleware.js';
@@ -28,10 +28,6 @@ import { registerDmRoutes } from './api/dm.js';
 import { registerMessageRoutes } from './api/messages.js';
 import { registerUploadRoutes } from './api/upload.js';
 import { registerV1Routes } from './api/v1.js';
-import {
-  registerTelegramAdminRoutes,
-  registerTelegramPublicRoutes
-} from './api/telegram.js';
 import { ChannelRoom } from './do/ChannelRoom.js';
 import { Scheduler } from './do/Scheduler.js';
 import { UserInbox } from './do/UserInbox.js';
@@ -46,6 +42,10 @@ import {
   requestBodyTooLarge,
   v1ErrorResponse
 } from './utils.js';
+import { EMBEDDED_ASSETS } from './embedded-static.js';
+import { serveEmbeddedStatic } from './static-serve.js';
+
+const PUBLIC_USERNAME_PATTERN = /^[A-Za-z0-9_]{2,32}$/;
 
 const app = new Hono();
 
@@ -67,14 +67,23 @@ app.use('/api/*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 
-app.get('/api/health', (c) => c.json({ ok: true }));
+app.get('/api/health', (c) => c.json({
+  ok: true,
+  worker: 'edgechat',
+  hasDB: Boolean(c.env.DB),
+  hasSESSIONS: Boolean(c.env.SESSIONS),
+  hasFILES: Boolean(c.env.FILES),
+  hasCHANNEL_ROOM: Boolean(c.env.CHANNEL_ROOM),
+  hasUSER_INBOX: Boolean(c.env.USER_INBOX),
+  hasSCHEDULER: Boolean(c.env.SCHEDULER)
+}));
 
 app.get('/api/site', async (c) => {
   const site = await getSiteSettings(c.env.DB);
   return c.json({ site });
 });
 
-registerTelegramPublicRoutes(app);
+app.all('/api/integrations/telegram/*', () => errorResponse('Telegram Bridge 未配置', 503));
 
 app.get('/api/register-links/:token', async (c) => {
   const token = String(c.req.param('token') || '').trim();
@@ -132,6 +141,46 @@ app.post('/api/register-links/:token/register', async (c) => {
   await ensureGeneralChannelMembership(c.env.DB, userId);
 
   return c.json({ ok: true });
+});
+
+app.post('/api/auth/register', async (c) => {
+  const payload = await parseJsonRequest(c.req.raw);
+  const username = String(payload.username || '').trim();
+  const password = String(payload.password || '');
+  const displayName = String(payload.displayName || username).trim();
+
+  if (!username || !password) {
+    return errorResponse('用户名和密码不能为空');
+  }
+  if (!PUBLIC_USERNAME_PATTERN.test(username)) {
+    return errorResponse('用户名需为 2-32 位字母、数字或下划线');
+  }
+  if (password.length < 6) {
+    return errorResponse('密码至少 6 位');
+  }
+
+  const existingCount = await countActiveUsers(c.env.DB);
+  if (existingCount > 0 && isConfiguredAdminUsername(c.env, username)) {
+    return errorResponse('该用户名不可用于公开注册');
+  }
+
+  const hashed = await hashPassword(password);
+  const userId = await createUser(c.env.DB, {
+    username,
+    displayName,
+    passwordHash: hashed.hash,
+    passwordSalt: hashed.salt,
+    isAdmin: existingCount === 0
+  });
+  await ensureGeneralChannelMembership(c.env.DB, userId);
+
+  const user = await getUserByUsername(c.env.DB, username);
+  const session = await createSession(c.env, user);
+  return c.json({
+    ok: true,
+    token: session.token,
+    session
+  });
 });
 
 app.post('/api/auth/login', async (c) => {
@@ -315,7 +364,6 @@ registerUploadRoutes(app);
 registerChannelRoutes(app);
 registerAdminRoutes(app);
 registerMaintenanceRoutes(app);
-registerTelegramAdminRoutes(app);
 
 app.get('/api/ws/:kind/:id', async (c) => {
   const session = c.get('session');
@@ -366,7 +414,17 @@ app.onError((error, c) => {
 });
 
 export default {
-  fetch: app.fetch,
+  async fetch(request, env, ctx) {
+    const pathname = new URL(request.url).pathname;
+    if (pathname.startsWith('/api/') || pathname.startsWith('/files/')) {
+      return app.fetch(request, env, ctx);
+    }
+    const staticResponse = serveEmbeddedStatic(pathname, EMBEDDED_ASSETS);
+    if (staticResponse) {
+      return staticResponse;
+    }
+    return app.fetch(request, env, ctx);
+  },
   async scheduled(_controller, env, ctx) {
     ctx.waitUntil(runScheduledGc(env));
   }

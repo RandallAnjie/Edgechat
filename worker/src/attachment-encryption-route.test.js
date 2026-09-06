@@ -53,7 +53,7 @@ test('attachment upload reports when the deployment has no R2 binding', async ()
 
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), {
-    error: '当前部署没有绑定 R2，无法上传附件'
+    error: 'R2 put/get mismatch'
   });
 });
 
@@ -131,7 +131,7 @@ test('authorized attachment download reports when the deployment has no R2 bindi
 
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), {
-    error: '当前部署没有绑定 R2，无法读取附件'
+    error: 'R2 put/get mismatch'
   });
 });
 
