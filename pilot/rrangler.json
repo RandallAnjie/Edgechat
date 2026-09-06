@@ -1,0 +1,38 @@
+{
+	"name": "edgechat-pilot",
+	"main": "src/index.js",
+	"compatibilityDate": "2026-07-05",
+	"files": [
+		"src/index.js",
+		"src/echo-room.js",
+		"src/echo-protocol.js",
+		"src/handlers.js",
+		"src/static-html.js"
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "edgechat-pilot-db"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "FILES",
+			"bucket_name": "edgechat-pilot-files"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "ECHO_ROOM",
+				"class_name": "EchoRoom"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["EchoRoom"]
+		}
+	]
+}

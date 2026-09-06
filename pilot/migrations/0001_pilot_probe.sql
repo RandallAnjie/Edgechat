@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS pilot_probe (
+	id INTEGER PRIMARY KEY
+);
