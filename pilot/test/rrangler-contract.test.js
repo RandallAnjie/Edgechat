@@ -32,7 +32,7 @@ test("worker entry exports EchoRoom", () => {
 test("pilot deploy scripts use rrangler, not official wrangler", () => {
 	const pkg = JSON.parse(read("package.json"));
 	for (const [name, script] of Object.entries(pkg.scripts)) {
-		assert.match(script, /rrangler|node --test/, `${name} should be rrangler or local tests`);
+		assert.match(script, /rrangler|node --test|node scripts\//, `${name} should be rrangler or local tests`);
 		assert.doesNotMatch(script, /(?<!r)wrangler/, `${name} must not call official wrangler`);
 	}
 	assert.equal(pkg.scripts.deploy, "npx --yes @bigrandall/rrangler@0.4.0 deploy");

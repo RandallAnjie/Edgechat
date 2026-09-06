@@ -47,8 +47,8 @@ function createFakeEchoRoom(captures) {
 			captures.push({ type: "get", id });
 			return {
 				async fetch(request) {
-					captures.push({ type: "fetch", url: request.url });
-					return new Response(null, { status: 101 });
+					captures.push({ type: "fetch", url: request.url, upgrade: request.headers.get("Upgrade") });
+					return new Response("forwarded", { status: 200, headers: { "x-pilot-do": "EchoRoom" } });
 				},
 			};
 		},
@@ -138,7 +138,9 @@ test("GET /ws forwards to EchoRoom when bound and 503 when not", async () => {
 		new Request("https://pilot.test/ws", { headers: { Upgrade: "websocket" } }),
 		{ ECHO_ROOM: createFakeEchoRoom(captures) },
 	);
-	assert.equal(forwarded.status, 101);
+	assert.equal(forwarded.status, 200);
+	assert.equal(forwarded.headers.get("x-pilot-do"), "EchoRoom");
 	assert.deepEqual(captures[0], { type: "name", name: "pilot" });
 	assert.equal(captures[1].id, "id:pilot");
+	assert.equal(captures[2].upgrade, "websocket");
 });

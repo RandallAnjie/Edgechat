@@ -168,6 +168,7 @@ From this directory or the repo root (`node --test` picks these files up):
 ```bash
 cd pilot && npm test
 # or from repo root: node --test pilot/test/*.test.js
+npm run preview   # local HTTP + WS fakes on :8788 — not RF, not wrangler
 ```
 
 Coverage is local only: health/D1/R2 handlers with memory fakes, echo protocol, hibernation feature-detect vs normal `accept()`, and the rrangler contract. There is no live RF in these tests.
